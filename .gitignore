@@ -1,0 +1,7 @@
+/venv
+/pliska_csv
+/top_10_csv
+/top_moths
+/final_models
+/logs
+*.pyc
