@@ -3,11 +3,11 @@
 #include <math.h>
 #include "ppo_weights.h"
 
-#define INPUT_DIM 21
+#define INPUT_DIM 18
 #define HIDDEN1_DIM 64
 #define HIDDEN2_DIM 64
 #define HIDDEN3_DIM 64
-#define OUTPUT_DIM 4
+#define OUTPUT_DIM 3
 
 void dense(const float *input, const float *weight, const float *bias,
            int in_dim, int out_dim, float *output, int apply_activation)
@@ -30,10 +30,9 @@ static inline float clip01(float x)
         return -1.f;
     if (x > 1.f)
         return 1.f;
-    return x; // unchanged when -1 ≤ x ≤ 1
+    return x;
 }
 
-// This is the function you'll call from Python
 __attribute__((visibility("default"))) void get_action(const float *obs, float *action_out)
 {
     float h1[HIDDEN1_DIM];
@@ -41,25 +40,21 @@ __attribute__((visibility("default"))) void get_action(const float *obs, float *
     float h3[HIDDEN3_DIM];
     float raw[OUTPUT_DIM];
 
-    // Layer 1: INPUT_DIM -> 64 (tanh)
     dense(obs,
           mlp_extractor_policy_net_0_weight,
           mlp_extractor_policy_net_0_bias,
           INPUT_DIM, HIDDEN1_DIM, h1, 1);
 
-    // Layer 2: 64 -> 64 (tanh)
     dense(h1,
           mlp_extractor_policy_net_2_weight,
           mlp_extractor_policy_net_2_bias,
           HIDDEN1_DIM, HIDDEN2_DIM, h2, 1);
 
-    // NEW Layer 3: 64 -> 64 (tanh)
     dense(h2,
-          mlp_extractor_policy_net_4_weight, // add these to ppo_weights.h
+          mlp_extractor_policy_net_4_weight,
           mlp_extractor_policy_net_4_bias,
           HIDDEN2_DIM, HIDDEN3_DIM, h3, 1);
 
-    // Output layer: 64 -> 4 (linear)
     dense(h3,
           action_net_weight,
           action_net_bias,

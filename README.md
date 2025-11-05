@@ -1,34 +1,101 @@
-# RL Motor Pursuer Policies for Interception
-This repository trains **reinforcement learning (RL)** policies that drive a **motor‑level quadrotor pursuer** to intercept a moving evader. It provides a vectorized simulation environment, physics‑based motor/airframe model, and evader generators (replayed from logs). Configuration lives in `config.py` and controls dynamics, observations, rewards, and domain randomization.
+# Drone Interception
 
-## Repository layout (key files)
-- `training.py` – PPO training entrypoint (Stable‑Baselines3) with vectorized environment and callbacks.
-- `simulation.py` – rollout for evaluation/visualization.
-- `env_pursuit_evasion.py` – `PursuitVecEnv` (Gymnasium‑style) that wires pursuer and evader, builds observations, computes rewards/dones.
-- `vec_pursuer_Motor.py` / `pursuer_Motor.py` – physics models for the pursuer at **motor level** (vectorized and single‑env variants).
-- `vec_moth_evader.py` / `vec_pliska_evader.py` – evaders that replay trajectories from logs with optional filtering/noise.
-- `config.py` – scenario/configuration; see **Configuration** below.
+Reinforcement Learning-Based Guidance and Control for Aerial-to-Aerial Pest Interception
 
-## Observations & Actions (summary)
+## Abstract
 
-- **Actions**: for the motor‑level pursuer the action is 4‑D in `[-1, 1]` (one per motor). Actions are filtered by first‑order motor time constants and mapped to motor speeds; thrust and body torques are produced by the provided polynomial motor model.
+---
 
-- **Observations**: the environment builds a concatenated vector including (normalized) pursuer/evader positions and velocities, line‑of‑sight (LOS) unit vectors and rates, and optional extras (see `src.utils.observation`). 
+## Overview
 
-## Rewards & Termination (summary)
+This repository contains the codebase for a reinforcement learning-based drone-pest interception controller. The codebase supports simulation training and a pipe-line for real-world deployment.
 
-- **Capture / interception**: episode terminates when the distance between pursuer and evader is ≤ `CAPTURE_RADIUS`. Set `STOP_ON_INTERCEPTION=True` to end early.
-- **Time limit**: episode also ends at `TOTAL_TIME` seconds.
-- **Reward**: configurable via `REWARD_TYPE` and weights (see `get_reward` in `src.utils.reward`). 
+INCLUDE .GIF HERE LATER !!!!
 
-## Frames & Gravity
+## Repository Structure
 
-Everything in this repo is expressed in **NED** (North‑East‑Down) unless stated otherwise. 
-Evaders replayed from logs can be converted (e.g., ENU→NED) inside the evader classes—check their constructors if your data is ENU.
+```
+Drone_Interception/
+├── src/                    # Core simulation and models
+│   ├── models/             # Drone and pest/evaders
+│   ├── simulation/         # Simulation environment (RL training & evaluation)
+│   ├── control_laws/       # Control law interface
+│   └── utils/              # Configuration, logging, utilities
+├── scripts/
+│   ├── training/           # Training scripts
+│   ├── analysis/           # Analysis and evaluation tools
+│   └── system_identification/  # System ID tool
+└── deployment/             # Real-world deployment code
+    ├── ivy_senders/        # Stream evader trajectories to Paparazzi (Ivy)
+    └── extract_validate.py # Model extraction and validation
+```
 
-## Configuration (`config.py`)
-`config.py` contains a single `CONFIG` dictionary. The most important sections are:
+**Note**: Training datasets and trained models are not included in the repository but may be available upon request.
 
-- **Global**: `DT`, `TOTAL_TIME`, `CAPTURE_RADIUS`, `ENV_BOUND`, etc.
-- **EVADER**: source of trajectories, filtering/noise, start/end sample indices or times.
-- **PURSUER**: dynamics and limits. For the motor model: thrust/torque polynomials, motor speed limits, actuator time constants, drag, etc
+## Key Components
+
+### Core Simulation (`src/`)
+
+- **Models**: 
+  - **Pursuers**: Motor-level, CTBR-INDI, and Acceleration-level controllers
+  - **Evaders**: Moth trajectories, Pliska trajectories, reactive RL evaders, and classic evaders (see [`src/models/evaders/README.md`](src/models/evaders/README.md) for CSV format requirements)
+- **Simulation**: 
+  - **RL Training Environment**: Vectorized Gymnasium environment for training (see [`src/simulation/README.md`](src/simulation/README.md))
+  - **Evaluation Simulation**: Standalone simulation for independent model evaluation
+- **Control Laws**: API for control laws
+- **Utils**: Configuration management, observation builders, reward functions, logging (see [`src/utils/README.md`](src/utils/README.md) for detailed config parameter documentation)
+
+### Training (`scripts/training/`)
+
+The training module provides tools for training reinforcement learning agents using PPO (Proximal Policy Optimization). See [`scripts/training/README.md`](scripts/training/README.md) for detailed documentation.
+
+
+### Analysis (`scripts/analysis/`)
+
+Analysis tools for evaluating trained models comparing different configurations in simulation, and processing physical drone flights (CyberZoo/PATS). See [`scripts/analysis/README.md`](scripts/analysis/README.md) for detailed documentation.
+
+### Deployment (`deployment/`)
+
+Methology for deploying trained models on physical drones and scripts for streaming target infornmation to paparazzi. See [`deployment/README.md`](deployment/README.md) for detailed documentation.
+
+### System Identification (`scripts/system_identification/`)
+
+Tools for identifying drone model parameters from paparazzi flight logs.
+
+## Quick Start
+
+### Installation
+
+To ensure compatibility, use python 3.10. Nessecary for compatibility with Stable-Baselines3 2.X and TensorFlow 1.x
+
+```bash
+pip install -r requirements.txt
+```
+
+### Basic Usage
+
+#### Run a Simulation
+
+```bash
+python scripts/main.py
+```
+
+This runs a single simulation using the configuration in `src/utils/config.py`, yielding an animation of the drone-pest pursuit. 
+
+#### Train a Model
+
+To train a single drone controller against an evader using the configuration in `src/utils/config.py`
+
+Example:
+```bash
+python scripts/training/single_env.py
+```
+
+## Configuration
+
+The configuration file is `src/utils/config.py`. See [`src/utils/README.md`](src/utils/README.md) for detailed documentation of all configuration parameters.
+
+
+## Datasets
+
+Training datasets used in this work may be available upon request. For information on creating compatible evader trajectory datasets, see [`src/models/evaders/README.md`](src/models/evaders/README.md).

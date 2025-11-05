@@ -1,16 +1,9 @@
 from __future__ import annotations
 import numpy as np
+from src.utils.helpers import split_vector
 from typing import Dict, List
 from typing import Optional, Tuple
 import pandas as pd
-
-
-def split_vector(v):
-    """Split N×3 vector into unit vector and magnitude"""
-    mag = np.linalg.norm(v, axis=1, keepdims=True)
-    safe_mag = np.where(mag < 1e-6, 1e-6, mag)  # avoid div by 0
-    unit = v / safe_mag
-    return unit, mag
 
 
 def get_rot_columns(phi, theta, psi):
@@ -58,15 +51,20 @@ def get_observation_size(config):
         "pos": 2 * (3 + 1),  # dir+mag for pu_pos, ev_pos
         "pos+vel": 4 * (3 + 1),  # pu+ev pos+vel
         "rel_pos": 1 * (3 + 1),
+        "vel": 2 * (3 + 1),
+        "rel_vel": 1 * (3 + 1),
         "rel_pos_body": 1 * (3 + 1),
+        "LOS_LOS_rate": 1 * (3 + 1) + 3,
         "rel_vel_body": 1 * (3 + 1),  # 3D direction + 1 magnitude
         "rel_pos+vel": 2 * (3 + 1),  # rel pos + rel vel
+        "rel_pos+vel_boundaries": 2 * (3 + 1) + 3,
         "rel_pos_vel_los_rate": 2 * (3 + 1) + 3,  # above + LOS angular rate (3)
         "rel_pos+vel_body": 2 * (3 + 1),
         "rel_pos_vel_los_rate_body": 2 * (3 + 1) + 3,
         "all": 4 * (3 + 1) + 2 * (3 + 1) + 3,
         "all_body_no_phi_rate": 4 * (3 + 1) + 2 * (3 + 1),
         "all_no_phi_rate": 4 * (3 + 1) + 2 * (3 + 1),
+        "all_no_phi_rate_boundaries": 4 * (3 + 1) + 2 * (3 + 1) + 3,
     }
 
     try:
@@ -114,11 +112,20 @@ def get_observation(config, ev_state, pu_state, obs_history=None, act_history=No
     act_steps = obs_cfg["ACTION_HISTORY_STEPS"]
     use_features = obs_cfg["OPTIONAL_FEATURES"]
 
+    b = config["PURSUER"]["BOUNDARIES"]["ENV_BOUNDS"]
+    bounds_min = np.array([min(b["x"]), min(b["y"]), min(b["z"])], dtype=np.float32)
+    bounds_max = np.array([max(b["x"]), max(b["y"]), max(b["z"])], dtype=np.float32)
+
     # Core states
     pu_pos = _batched(pu_state["noisy_position"])
     ev_pos = _batched(ev_state["filtered_position"])
     pu_vel = _batched(pu_state["noisy_velocity"])
     ev_vel = _batched(ev_state["filtered_velocity"])
+
+    # distance to each side along each axis; nearest-wall distance per axis
+    d_to_min = pu_pos - bounds_min[None, :]  # (N,3)
+    d_to_max = bounds_max[None, :] - pu_pos  # (N,3)
+    dist_to_wall = np.minimum(d_to_min, d_to_max)  # (N,3)
 
     rel_pos = ev_pos - pu_pos
     rel_vel = ev_vel - pu_vel
@@ -153,15 +160,31 @@ def get_observation(config, ev_state, pu_state, obs_history=None, act_history=No
     elif mode == "rel_pos":
         add_dir_mag(rel_pos)
 
+    elif mode == "vel":
+        add_dir_mag(pu_vel)
+        add_dir_mag(ev_vel)
+
+    elif mode == "rel_vel":
+        add_dir_mag(rel_vel)
+
     elif mode == "rel_vel_body":
         add_dir_mag(rel_vel_body)
 
     elif mode == "rel_pos_body":
         add_dir_mag(rel_pos_body)
 
+    elif mode == "LOS_LOS_rate":
+        add_dir_mag(rel_pos_body)
+        features.append(phi_dot)
+
     elif mode == "rel_pos+vel":
         add_dir_mag(rel_pos)
         add_dir_mag(rel_vel)
+
+    elif mode == "rel_pos+vel_boundaries":
+        add_dir_mag(rel_pos)
+        add_dir_mag(rel_vel)
+        features.append(dist_to_wall)
 
     elif mode == "rel_pos_vel_los_rate":
         add_dir_mag(rel_pos)
@@ -201,6 +224,15 @@ def get_observation(config, ev_state, pu_state, obs_history=None, act_history=No
         add_dir_mag(ev_vel)
         add_dir_mag(rel_pos_body)
         add_dir_mag(rel_vel_body)
+
+    elif mode == "all_no_phi_rate_boundaries":
+        add_dir_mag(pu_pos)
+        add_dir_mag(ev_pos)
+        add_dir_mag(pu_vel)
+        add_dir_mag(ev_vel)
+        add_dir_mag(rel_pos)
+        add_dir_mag(rel_vel)
+        features.append(dist_to_wall)
 
     else:
         raise ValueError(f"Unknown OBS_MODE: {mode}")
@@ -261,6 +293,14 @@ def _describe_observation_layout(config: Dict) -> pd.DataFrame:
         add("dir_rel_pos (x,y,z)", 3)
         add("|rel_pos|", 1)
 
+    elif mode == "vel":
+        add("dir_vel (x,y,z)", 3)
+        add("|vel|", 1)
+
+    elif mode == "rel_vel":
+        add("dir_rel_vel (x,y,z)", 3)
+        add("|rel_vel|", 1)
+
     elif mode == "rel_vel_body":
         add("dir_rel_vel_body (x,y,z)", 3)
         add("|rel_vel_body|", 1)
@@ -268,6 +308,11 @@ def _describe_observation_layout(config: Dict) -> pd.DataFrame:
     elif mode == "rel_pos_body":
         add("dir_rel_pos_body (x,y,z)", 3)
         add("|rel_pos_body|", 1)
+
+    elif mode == "LOS_LOS_rate":
+        add("dir_rel_pos_body (x,y,z)", 3)
+        add("|rel_pos_body|", 1)
+        add("LOS angular rate (x,y,z)", 3)
 
     elif mode == "pos+vel":
         add("dir_pu_pos (x,y,z)", 3)
@@ -285,6 +330,13 @@ def _describe_observation_layout(config: Dict) -> pd.DataFrame:
         add("dir_rel_vel (x,y,z)", 3)
         add("|rel_vel|", 1)
 
+    elif mode == "rel_pos+vel_boundaries":
+        add("dir_rel_pos (x,y,z)", 3)
+        add("|rel_pos|", 1)
+        add("dir_rel_vel (x,y,z)", 3)
+        add("|rel_vel|", 1)
+        add("dist_to_wall (dx,dy,dz)", 3)
+
     elif mode == "rel_pos_vel_los_rate":
         add("dir_rel_pos (x,y,z)", 3)
         add("|rel_pos|", 1)
@@ -293,16 +345,16 @@ def _describe_observation_layout(config: Dict) -> pd.DataFrame:
         add("LOS angular rate (x,y,z)", 3)
 
     elif mode == "rel_pos+vel_body":
-        add("dir_rel_pos (x,y,z)", 3)
-        add("|rel_pos|", 1)
-        add("dir_rel_vel (x,y,z)", 3)
-        add("|rel_vel|", 1)
+        add("dir_rel_pos_body (x,y,z)", 3)
+        add("|rel_pos_body|", 1)
+        add("dir_rel_vel_body (x,y,z)", 3)
+        add("|rel_vel_body|", 1)
 
     elif mode == "rel_pos_vel_los_rate_body":
-        add("dir_rel_pos (x,y,z)", 3)
-        add("|rel_pos|", 1)
-        add("dir_rel_vel (x,y,z)", 3)
-        add("|rel_vel|", 1)
+        add("dir_rel_pos_body (x,y,z)", 3)
+        add("|rel_pos_body|", 1)
+        add("dir_rel_vel_body (x,y,z)", 3)
+        add("|rel_vel_body|", 1)
         add("LOS angular rate (x,y,z)", 3)
 
     elif mode == "all":
@@ -333,6 +385,21 @@ def _describe_observation_layout(config: Dict) -> pd.DataFrame:
         add("|rel_pos|", 1)
         add("dir_rel_vel (x,y,z)", 3)
         add("|rel_vel|", 1)
+
+    elif mode == "all_no_phi_rate_boundaries":
+        add("dir_pu_pos (x,y,z)", 3)
+        add("|pu_pos|", 1)
+        add("dir_ev_pos (x,y,z)", 3)
+        add("|ev_pos|", 1)
+        add("dir_pu_vel (x,y,z)", 3)
+        add("|pu_vel|", 1)
+        add("dir_ev_vel (x,y,z)", 3)
+        add("|ev_vel|", 1)
+        add("dir_rel_pos (x,y,z)", 3)
+        add("|rel_pos|", 1)
+        add("dir_rel_vel (x,y,z)", 3)
+        add("|rel_vel|", 1)
+        add("dist_to_wall (dx,dy,dz)", 3)
 
     elif mode == "all_body_no_phi_rate":
         add("dir_pu_pos (x,y,z)", 3)

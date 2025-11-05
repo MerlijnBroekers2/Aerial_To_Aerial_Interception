@@ -36,13 +36,8 @@ def build_run_prefix(cfg: Dict) -> str:
     parts = [
         cfg["PURSUER"]["MODEL"].capitalize(),
         cfg["EVADER"]["MODEL"].capitalize(),
-        f"dt{_format_float(cfg['DT'])}",
-        f"T{cfg['TIME_LIMIT']}",
-        f"CapRadius{_format_float(cfg['CAPTURE_RADIUS'])}",
-        f"Bound{_format_float(cfg['ENV_BOUND'])}",
         obs_cfg["OBS_MODE"],
         f"His{obs_cfg['HISTORY_STEPS']}",
-        f"ActHis{obs_cfg['ACTION_HISTORY_STEPS']}",
         cfg["reward_type"],
         f"DR{_get_dr_percentage(cfg)}",
     ]

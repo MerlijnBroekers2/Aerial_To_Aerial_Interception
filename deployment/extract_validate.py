@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 build-and-check.py
   1.  export PPO policy weights to ppo_weights.h
@@ -11,9 +10,10 @@ Exit code is 0 if validation succeeds, 1 otherwise.
 
 Usage example:
     python deployment/extract_validate.py \
-        --model /Users/merlijnbroekers/Desktop/Drone_Interception/abstraction_level_dr/motor/dr30/models/best_model.zip \
+        --model /Users/merlijnbroekers/Desktop/Drone_Interception/final_models/Acc_indi_Moth_dt0p01_T1200_CapRadius0p15_Bound10_rel_pos+vel_body_His0_ActHis0_effective_gain_DR0_0820_1054/ppo_checkpoint_step_15000000.zip \
         --csrc  deployment/ppo_controller.c
 """
+
 import argparse, platform, shutil, subprocess, sys
 from pathlib import Path
 
@@ -21,15 +21,15 @@ import numpy as np
 import torch
 from stable_baselines3 import PPO
 
-# ───────────── configuration ──────────────────────────────────────────────
+# configuration
 HEADER_NAME = "ppo_weights.h"
 LIB_BASE = "libppo_controller"
 TOLERANCE = 1e-5
 NUM_TESTS = 500
-OBS_RANGE = (-100.0, 100.0)  # change to match your environment
-INPUT_DIM = 21
-OUTPUT_DIM = 4
-# ───────────────────────────────────────────────────────────────────────────
+OBS_RANGE = (-100.0, 100.0)
+INPUT_DIM = 18  # change to match current configuartion
+OUTPUT_DIM = 3  # change to match current configuartion
+# ----------------------------------------------------------------------------
 
 
 def export_header(state_dict, out_path: Path) -> None:

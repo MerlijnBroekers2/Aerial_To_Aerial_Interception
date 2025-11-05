@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.control_laws import Input
+from src.control_laws.control_laws import Input
 from src.utils.config import CONFIG
 from src.utils.observations import ObservationManager
 
@@ -68,6 +68,7 @@ class Simulation:
                     "p_state": p_state,
                     "e_state": e_state,
                     "guidance_state": guidance_state,
+                    "action": np.asarray(accel_cmd, dtype=float).ravel(),
                 }
             )
 

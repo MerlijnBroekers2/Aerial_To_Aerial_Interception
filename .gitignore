@@ -1,7 +1,34 @@
-/venv
-/pliska_csv
-/top_10_csv
-/top_moths
-/final_models
-/logs
+# Ignore virtual environment
+venv/
+rlvenv/
+opogona_moth_data/
+logs/
+logs_evader/
+final_models/
+final_models_selfplay/
+final_models_evader/
+deployment_build/
+
+# Ignore compiled Python files
+__pycache__/
 *.pyc
+
+# Ignore all CSV files
+*.csv
+
+*.pdf
+*.png
+*.vscode
+*.pkl
+*.mp4
+*.gif
+rlenv/
+*.python-version
+*.zip
+*.DS_Store
+*.pth
+*.dylib
+*.json
+*.pkl.gz
+*.npz
+*.DS_Store
