@@ -1,6 +1,4 @@
-# Drone Interception
-
-Reinforcement Learning-Based Guidance and Control for Aerial-to-Aerial Pest Interception
+# Reinforcement Learning-Based Guidance and Control for Aerial-to-Aerial Pest Interception
 
 ## Abstract
 
