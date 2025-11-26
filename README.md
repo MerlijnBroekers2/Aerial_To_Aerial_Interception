@@ -10,9 +10,6 @@ PATS-X is a greenhouse pest suppression system that uses a depth camera with an 
 
 This repository contains the codebase for a reinforcement learning-based drone-pest interception controller. The codebase supports simulation training and a pipe-line for real-world deployment.
 
-![Drone-pest interception demo](animation.gif)
-
-
 ## Repository Structure
 
 ```
@@ -100,3 +97,7 @@ The configuration file is `src/utils/config.py`. See [`src/utils/README.md`](src
 ## Datasets
 
 Training datasets used in this work may be available upon request. For information on creating compatible evader trajectory datasets, see [`src/models/evaders/README.md`](src/models/evaders/README.md).
+
+## Animation
+
+![Drone-pest interception demo](animation.gif)
