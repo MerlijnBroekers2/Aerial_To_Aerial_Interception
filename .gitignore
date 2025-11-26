@@ -21,7 +21,7 @@ __pycache__/
 *.vscode
 *.pkl
 *.mp4
-*.gif
+# *.gif
 rlenv/
 *.python-version
 *.zip
